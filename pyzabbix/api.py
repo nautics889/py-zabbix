@@ -34,6 +34,7 @@ except ImportError:
 
 from .version import __version__
 from .logger import NullHandler, HideSensitiveFilter, HideSensitiveService
+from .utils import compare_versions
 
 null_handler = NullHandler()
 logger = logging.getLogger(__name__)
@@ -88,6 +89,29 @@ class ZabbixAPIObjectClass(object):
 
             method = '{0}.{1}'.format(self.group, name)
             logger.debug("Call %s method", method)
+
+            if 'application' in kwargs:
+                api_version = self.parent.api_version()
+                if compare_versions(api_version, '5.4') in (0, 1):
+                    app_name = kwargs.pop('application')
+                    logger.debug(
+                        'Since Zabbix API version is %s (greater than or '
+                        'equals 5.4) the application "%s" is going to be '
+                        'passed as a tag.', api_version, app_name)
+                    app_tag = ({'tag': 'Application', 'value': app_name}, )
+
+                    tags = kwargs.get('tags')
+
+                    if tags is None:
+                        kwargs.update(tags=app_tag)
+                    elif isinstance(tags, list):
+                        tags.extend(app_tag)
+                    elif isinstance(tags, tuple):
+                        kwargs.update(tags=tags + app_tag)
+                    else:
+                        raise ValueError(
+                            '`tags` should be a list or a tuple. Provided: %s',
+                            tags.__class__)
 
             return self.parent.do_request(
                 method,
